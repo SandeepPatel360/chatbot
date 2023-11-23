@@ -1,48 +1,28 @@
-var express = require('express');
-var bodyParser = require('body-parser')
-var app = express();
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
-var mongoose = require('mongoose');
+const express = require('express');
+const bodyParser = require('body-parser')
+const app = express();
+const http = require('http').Server(app);
+const io = require('socket.io')(http);
+const mongoose = require('mongoose');
+const dbconnect = require('./config/database');
+require("dotenv").config();
+const Message = require('./models/Message');
+const  { Configuration, OpenAIApi } = require("openai");
+const axios = require('axios');
 
-const MongoClient = require('mongodb').MongoClient;
 
 app.use(express.static(__dirname));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-var Message = mongoose.model('messages', {
-    name: String,
-    message: String
+
+
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
-const uri = 'mongodb+srv://admin:admin123@cluster0-8bide.mongodb.net/ChatBotdb?retryWrites=true';
+const openai = new OpenAIApi(configuration);
 
-//const client = new MongoClient(uri, { useNewUrlParser: true });
-
-// MongoClient.connect(uri, { useNewUrlParser: true }, function (err, client) {
-//     //const collection = client.db("ChatBotdb").collection("Message");
-//     if (err) {
-//         console.log('Error occurred while connecting to MongoDB Atlas...\n', err);
-//     }
-//     console.log('Connected...');
-//     // const collection = client.db("ChatBotdb").collection("messages");
-//     // perform actions on the collection object
-//     //client.close();
-//     //console.log('mongodb connected', err);
-// })
-
-// var server = app.listen(3000, () => {
-//     console.log('server is running on port', server.address().port);
-// });
-//var dbUrl = 'mongodb://username:pass@ds257981.mlab.com:57981/simple-chat'
-//var dbUrl = 'mongodb+srv://admin:admin123@cluster0-8bide.mongodb.net/test?retryWrites=true'
-
-// mongoose.connect(dbUrl, (err) => {
-//     console.log('mongodb connected', err);
-// });
-
-//const uri = "mongodb+srv://admin:admin123@cluster0-8bide.mongodb.net/test?retryWrites=true";
 
 app.get('/messages', (req, res) => {
 
@@ -61,12 +41,12 @@ app.get('/messages', (req, res) => {
 })
 
 
-app.get('/messages/:user', (req, res) => {
-    var user = req.params.user
-    Message.find({ name: user }, (err, messages) => {
-        res.send(messages);
-    })
-})
+// app.get('/messages/:user', (req, res) => {
+//     var user = req.params.user
+//     Message.find({ name: user }, (err, messages) => {
+//         res.send(messages);
+//     })
+// })
 
 
 app.post('/messages', async (req, res) => {
@@ -93,24 +73,43 @@ app.post('/messages', async (req, res) => {
     }
 
 })
-io.on('connection', () => {
+
+app.get('/openai-key', (req, res) => {
+    
+    res.json({ apiKey: process.env.OPENAI_API_KEY });
+});
+
+
+app.post('/chat', async (req, res) => {
+    try {
+        const prompt = req.body.prompt;
+
+        const response = await openai.createCompletion({
+            model: "text-davinci-003",
+            prompt: `${prompt}`,
+            temperature: 0,
+            max_tokens: 3000,
+            top_p: 1,
+            frequency_penalty: 0.5,
+            presence_penalty: 0,
+        });
+        console.log(data.choices[0].message.content);
+        res.status(200).send({
+            bot: response.data.choices[0].text
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send(error);
+    }
+})
+
+
+io.on('connectio  n', () => {
     console.log('a user is connected')
 })
-mongoose.connect(uri, { useNewUrlParser: true }, (err) => {
-    if (err) { console.log('Error while connecting', err) }
-    console.log('mongodb connected ');
-})
-// client.connect(err => {
-//     //const collection = client.db("ChatBotdb").collection("Message");
 
-//     console.log('mongodb connected', err);
-// })
-// client.connect(err => {
-//     const collection = client.db("ChatBotdb").collection("Message");
-//     // perform actions on the collection object
-//     console.log('mongodb connected', err);
-//     //client.close();
-// });
+dbconnect();
+
 
 var server = http.listen(3000, () => {
     console.log('server is running on port', server.address().port);

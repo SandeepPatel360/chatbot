@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>My First Node App</title>
+    <title>CHATBOT</title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css"
         integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     <script src="https://code.jquery.com/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
@@ -21,15 +21,19 @@
         <div class="jumbotron">
             <h1 class="display-4">Chat Bot</h1>
             <br>
-            <input id="name" class="form-control" placeholder="Name">
-            <br>
+            <!-- <input id="name" class="form-control" placeholder="Name">
+            <br> -->
             <textarea id="message" class="form-control" placeholder="Your Message Here"></textarea>
             <br>
             <button id="send" class="btn btn-success">Send</button>
-            <h1 class="text-right">version 1.0</h1>
+            <!-- <h1 class="text-right">version 1.0</h1> -->
         </div>
         <div id="messages">
 
+        </div>
+        <div id="response-container">
+            <h4>Chatbot Response:</h4>
+            <p id="response"></p>
         </div>
     </div>
     <script>
@@ -37,13 +41,14 @@
         $(() => {
             $("#send").click(() => {
                 console.log('Sending message from client');
-                sendMessage({ name: $("#name").val(), message: $("#message").val() });
+                sendMessage({  message: $("#message").val() });
             })
-            getMessages()
+            getMessages();
+            getOpenAIResponse();
         })
         socket.on('message', addMessages)
         function addMessages(message) {
-            $("#messages").append(`<h4> ${message.name} </h4> <p> ${message.message} </p>`)
+            $("#messages").append(` <p> ${message.message} </p>`)
         }
         function getMessages() {
             $.get('http://localhost:3000/messages', (data) => {
@@ -53,6 +58,46 @@
         function sendMessage(message) {
             $.post('http://localhost:3000/messages', message)
         }
+    
+        function getOpenAIResponse() {
+            $.get('http://localhost:3000/openai-key', (data) => {
+                // console.log(data);
+                const apiKey = data.apiKey;
+
+
+                $("#send").click(() => {
+                    const userMessage = $("#message").val();
+
+                    // Use the obtained API key to make a request to OpenAI
+                    $.ajax({
+                        type: "POST",
+                        url: 'http://localhost:3000/chat',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        data: JSON.stringify({ prompt: userMessage }),
+                        success: function (response) {
+                            // Display the OpenAI response in the 'response' element
+                            console.log(response);
+                            $("#response").text(response.bot);
+                        },
+                        error: function (error) {
+                        if (error.status === 429 && retryCount < 5) {
+                            // If rate limited, retry after a delay
+                            retryCount++;
+                            setTimeout(() => makeRequest(), 2000 * retryCount);
+                        } 
+                        else {
+                            console.error("Error getting OpenAI response:", error);
+                        }
+                    }
+                    });
+                });
+            });
+        }
+
+                
     </script>
 </body>
 
